@@ -18,5 +18,18 @@ def list_files():
 def get_file(filename):
     return send_from_directory(FILES_DIR, filename)
 
+# NEW VIEW ROUTE
+@app.route("/view/<filename>")
+def view_file(filename):
+    filepath = os.path.join(FILES_DIR, filename)
+
+    if not os.path.exists(filepath):
+        return "File not found", 404
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    return f"<pre>{content}</pre>"
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
