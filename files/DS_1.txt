@@ -1,0 +1,40 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+df = pd.read_csv("assignment_1_dirty_cafe_sales.csv")
+
+
+print(df.head())
+
+
+print(df.shape)
+
+
+print(df.dtypes)
+
+
+df['Quantity'] = pd.to_numeric(df['Quantity'],errors="coerce")
+df['Price Per Unit'] = pd.to_numeric(df['Price Per Unit'],errors="coerce")
+df['Total Spent'] =pd.to_numeric(df['Total Spent'],errors="coerce")
+df['Transaction Date']= pd.to_datetime(df['Transaction Date'],errors="coerce")
+df['Item']= df['Item'].astype('category')
+df['Payment Method']=df['Payment Method'].astype('category')
+
+
+print(df.isnull().sum())
+
+
+df = df.fillna(0)
+
+
+
+df['Location'] = df['Location'].map(
+    {
+        'In-Store':0,
+        'Takeaway':1
+    }
+)
+
+
+print(df['Location'].value_counts())
