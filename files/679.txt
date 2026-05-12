@@ -1,0 +1,141 @@
+import numpy as np
+
+
+# ============================================
+# Sigmoid Function
+# ============================================
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+# ============================================
+# Sigmoid Derivative
+# ============================================
+
+def derivative(x):
+    return x * (1 - x)
+
+
+# ============================================
+# XOR Dataset
+# ============================================
+
+x = np.array([
+    [0,0],
+    [0,1],
+    [1,0],
+    [1,1]
+])
+
+y = np.array([
+    [0],
+    [1],
+    [1],
+    [0]
+])
+
+
+# ============================================
+# Initialize Weights
+# ============================================
+
+np.random.seed(1)
+
+weights_input_hidden = np.random.uniform(size=(2,2))
+
+bias_hidden = np.random.uniform(size=(1,2))
+
+weights_hidden_output = np.random.uniform(size=(2,1))
+
+bias_output = np.random.uniform(size=(1,1))
+
+
+# ============================================
+# Training Parameters
+# ============================================
+
+learning_rate = 0.1
+
+epochs = 10000
+
+
+# ============================================
+# Training Loop
+# ============================================
+
+for epoch in range(epochs):
+
+    # ----------------------------------------
+    # FORWARD PROPAGATION
+    # ----------------------------------------
+
+    hidden_input = np.dot(x, weights_input_hidden) + bias_hidden
+
+    hidden_output = sigmoid(hidden_input)
+
+    output_input = np.dot(hidden_output,
+                          weights_hidden_output) + bias_output
+
+    predicted_output = sigmoid(output_input)
+
+
+    # ----------------------------------------
+    # ERROR
+    # ----------------------------------------
+
+    error = y - predicted_output
+
+
+    # ----------------------------------------
+    # BACKPROPAGATION
+    # ----------------------------------------
+
+    d_predicted_output = error * derivative(predicted_output)
+
+    error_hidden = d_predicted_output.dot(
+        weights_hidden_output.T
+    )
+
+    d_error_hidden = error_hidden * derivative(hidden_output)
+
+
+    # ----------------------------------------
+    # UPDATE WEIGHTS
+    # ----------------------------------------
+
+    weights_hidden_output += hidden_output.T.dot(
+        d_predicted_output
+    ) * learning_rate
+
+    bias_output += np.sum(
+        d_predicted_output,
+        axis=0,
+        keepdims=True
+    ) * learning_rate
+
+
+    weights_input_hidden += x.T.dot(
+        d_error_hidden
+    ) * learning_rate
+
+    bias_hidden += np.sum(
+        d_error_hidden,
+        axis=0,
+        keepdims=True
+    ) * learning_rate
+
+
+# ============================================
+# Final Output
+# ============================================
+
+print("Predicted Output:\n")
+
+print(predicted_output)
+
+binary_output = np.where(predicted_output >= 0.5, 1, 0)
+
+print("\nBinary Output:\n")
+
+print(binary_output)

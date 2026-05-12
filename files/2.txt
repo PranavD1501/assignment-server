@@ -1,0 +1,51 @@
+import numpy as np
+
+input_patterns =[
+    [0,0],
+    [1,0],
+    [1,1],
+    [0,1]
+]
+
+# Both Excitaroy Weights
+w1 = 1
+w2 = 1
+
+theta = 1
+
+def activation(x):
+    return np.where(x>=theta,1,0)
+
+
+for x1,x2 in input_patterns:
+    yin = w1*x1 + w2*x2
+
+    y = activation(yin)
+
+    print(f"Input : {x1,x2} Output : {y}")
+
+
+#Both inhibitory weights
+
+w3 = -1
+w4 = -1
+
+for x1,x2 in input_patterns:
+    yin = w3*x1 + w4*x2
+
+    y = activation(yin)
+
+    print(f"Input : {x1,x2} Output : {y}")
+
+
+#One Exciatory and One Inhibitory
+
+w5 = 1
+w6 = -1
+
+for x1,x2 in input_patterns:
+    yin = w5*x1 + w6*x2
+
+    y = activation(yin)
+
+    print(f"Input : {x1,x2} Output : {y}")

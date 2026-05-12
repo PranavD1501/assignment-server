@@ -1,0 +1,80 @@
+import tensorflow as tf
+from tensorflow.keras import models,layers,datasets,utils
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Flatten , Dense
+
+
+(x_train,y_train),(x_test,y_test) = datasets.mnist.load_data()
+
+
+#Normalization
+
+x_train = x_train/255.0
+x_test = x_test/255.0
+
+
+y_train = to_categorical(y_train,10)
+y_test = to_categorical(y_test,10)
+
+model = Sequential()
+
+model.add(Flatten(input_shape=(28,28)))
+
+model.add(Dense(128,activation='relu'))
+
+model.add(Dense(64,activation='relu'))
+
+model.add(Dense(10,activation='softmax'))
+
+
+model.compile(
+    optimizer='adam',
+    loss ='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+model.summary()
+
+
+history = model.fit(x_train,y_train,epochs=10,batch_size=32,validation_split=0.2)
+
+
+test_loss,test_accuracy = model.evaluate(x_test,y_test)
+
+print(test_loss)
+print(test_accuracy)
+
+
+predictions = model.predict(x_test)
+
+predicted_labels = np.argmax(predictions,axis=1)
+
+actual_labels = np.argmax(y_test,axis=1)
+
+
+
+for i in range(5):
+
+  plt.imshow(x_test[i])
+
+  plt.title(f"Predicted : {predicted_labels[i]}  |" f"Actual : {actual_labels[i]}")
+
+  plt.show()
+
+
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+
+plt.legend(['Training','Validation'])
+
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+
+plt.legend(['Loss',"Validation Loss"])
+
+

@@ -1,0 +1,41 @@
+import numpy as np
+
+vectors = np.array([
+    [1,1,-1,-1],
+    [-1,-1,1,1],
+    [1,-1,1,-1],
+    [-1,1,-1,1]
+])
+
+
+def hopfield(patterns):
+    num_patterns , n = patterns.shape
+
+    weights = np.zeros((n,n))
+
+    for p in patterns :
+        weights += np.outer(p,p)
+    
+
+    np.fill_diagonal(weights,0)
+
+    return weights
+
+def activation(x):
+    return np.where(x>=0,1,-1)
+
+
+def recall(input_vector,weights,steps=5):
+    state = np.array(input_vector)
+
+    for _ in range(steps):
+        state = activation(np.dot(weights,state))
+    
+    return state
+
+
+w = hopfield(vectors)
+print(w)
+
+for pattern in vectors:
+    print(recall(pattern,w))

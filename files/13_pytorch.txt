@@ -1,0 +1,56 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets,transforms
+
+
+transform = transforms.ToTensor()
+train_data = datasets.MNIST(root='./data',train=True,download=True,transform=transform)
+test_data = datasets.MNIST(root='./data',train=False,transform=transform)
+
+train_loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+
+
+
+class Net(nn.Module):
+  def __init__ (self):
+    super(Net,self).__init__()
+    self.fc1 = nn.Linear(28*28,128)
+    self.fc2 = nn.Linear(128,10)
+
+
+  def forward(self,x):
+    x = x.view(-1,28*28)
+    x=torch.relu(self.fc1(x))
+    x = self.fc2(x)
+    return x
+
+
+model = Net()
+
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(),lr=0.01)
+
+for epoch in range(5):
+  for image,labels in train_loader:
+    optimizer.zero_grad()
+    outputs = model(image)
+    loss = criterion(outputs,labels)
+    loss.backward()
+    optimizer.step()
+
+
+
+image , label = test_data[0]
+
+model.eval()
+with torch.no_grad():
+  output = model(image.view(-1,28*28))
+  predicted = torch.argmax(output)
+
+
+print("Actual : ",label)
+print("Predicted : ",predicted.item())
+
+

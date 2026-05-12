@@ -1,0 +1,82 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+x = np.linspace(-10,10,100)
+
+def linear_activation(x):
+  return x
+
+plt.plot(x,linear_activation(x))
+plt.title('Linear Activation')
+
+
+def sigmoid_activation(x):
+  return 1 / (1 + np.exp(-x))
+
+def sigmoid_derivative(x):
+  return x * (1-x)
+
+y = sigmoid_activation(x)
+y_derivative = sigmoid_derivative(y)
+
+plt.plot(y)
+plt.plot(y_derivative)
+
+plt.title('Sigmoid Activation')
+
+
+def tanh_activation(x):
+  return np.tanh(x)
+
+def tanh_derivative(x):
+  y = tanh_activation(x)
+  return 1 - y**2
+
+y = tanh_activation(x)
+y_derivative = tanh_derivative(y)
+
+plt.plot(y)
+plt.plot(y_derivative)
+plt.title('Tanh Activation')
+
+
+def relu_activation(x):
+  return np.maximum(0,x)
+
+def relu_derivative(x):
+  return np.where(x>0,1,0)
+
+y = relu_activation(x)
+y_derivative = relu_derivative(y)
+
+plt.plot(y)
+plt.plot(y_derivative)
+
+plt.title("Relu Activation")
+
+
+
+def binary_activation(x):
+  return np.where(x>=0,1,0)
+
+plt.plot(binary_activation(x))
+
+
+
+def swish_activation(x):
+  return x * sigmoid_activation(x)
+
+
+plt.plot(swish_activation(x))
+
+
+
+
+def leaky_relu(x,alpha=0.1):
+  return np.where(x>0,x,alpha * x)
+
+def leaky_relu_derivative(x,alpha=0.1):
+  return np.where(x>0,1,alpha)
+
+plt.plot(leaky_relu(x))
+plt.plot(leaky_relu_derivative(x))

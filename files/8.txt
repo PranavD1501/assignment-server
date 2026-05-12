@@ -1,0 +1,55 @@
+import numpy as np
+
+patterns = np.array([
+    [1,0,1,0],
+    [1,1,0,0],
+    [0,0,1,1],
+    [0,1,1,0]
+])
+
+
+rho = 0.9 #vigilance parameter
+
+n_features = patterns.shape[1]
+
+max_clusters = len(patterns)
+
+bottom_up = np.ones((max_clusters,n_features))
+
+
+top_down = np.ones((max_clusters,n_features)) / (1 + n_features)
+
+clusters = []
+
+
+#Training
+
+for pattern in patterns:
+    matched = False
+
+
+    for i in range(len(clusters)):
+
+        match_score = np.sum(pattern * top_down[i]) / np.sum(pattern)
+
+        if match_score >= rho:
+            top_down[i] = top_down[i] * pattern
+
+            matched = True
+
+            print(f"Pattern {pattern} belongs to {i+1} cluster")
+
+            break
+    
+    if not matched :
+        clusters.append(pattern)
+
+        new_index  = len(clusters) - 1
+        top_down[new_index] = pattern
+
+        print(f"Pattern {pattern} creates new cluster {len(clusters)}")
+
+
+for i , cluster in enumerate(clusters):
+    print(f"\nCluster {i+1} : ")
+    print(cluster)

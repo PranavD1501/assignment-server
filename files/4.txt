@@ -1,0 +1,50 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def perceptron_learning(inputs,labels,learning_rate=0.1,epochs=100):
+    weights = np.random.rand(2)
+    bias = np.random.rand(1)
+
+    for epoch in range(epochs):
+
+        for x,y in zip(inputs,labels):
+
+            prediction = np.dot(weights,x) + bias
+            prediction =1 if prediction >=0 else 0
+
+            error = y - prediction
+
+            weights += learning_rate * error * x
+            bias += learning_rate * error
+    
+    return weights,bias
+
+
+inputs = np.array([[1, 2], [2, 3], [3, 1], [4, 4], [5, 3], [6, 4]])
+labels = np.array([0, 0, 0, 1, 1, 1])
+
+
+weights , bias = perceptron_learning(inputs,labels)
+
+print(weights,bias)
+
+def plot_descision_boundary(inputs,labels,weights,bias):
+    for i in range(len(inputs)):
+
+        if labels[i] == 0:
+            plt.scatter(inputs[i][0],inputs[i][1],color='red')
+        else:
+            plt.scatter(inputs[i][0],inputs[i][1],color='blue')
+
+        
+    
+    x_values = np.array([0,7])
+
+    y_values = -(weights[0] * x_values + bias) / weights[1]
+
+    plt.plot(x_values,y_values)
+
+    
+    plt.show()
+
+plot_descision_boundary(inputs,labels,weights,bias)
