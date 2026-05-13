@@ -1,0 +1,46 @@
+import numpy as np 
+ 
+# ASCII binary values of numbers 0 to 9 
+X = [] 
+ 
+for i in range(10): 
+    binary = format(ord(str(i)), '07b') 
+    X.append([int(bit) for bit in binary]) 
+X = np.array(X) 
+ 
+# Target output 
+y = np.array([0,1,0,1,0,1,0,1,0,1]) 
+ 
+# Initialize weights and bias 
+w = np.random.rand(7)
+b = np.random.rand() 
+# Learning rate 
+lr = 0.1 
+ 
+# Step activation function 
+def step(x): 
+    if x >= 0: 
+        return 1 
+    else: 
+        return 0 
+ 
+# Training perceptron 
+for epoch in range(100): 
+    for i in range(10): 
+        net = np.dot(X[i], w) + b 
+        output = step(net) 
+        error = y[i] - output 
+        # Weight update 
+        w = w + lr * error * X[i] 
+        # Bias update 
+        b = b + lr * error 
+ 
+# Testing 
+print("Number Recognition") 
+for i in range(10): 
+    net = np.dot(X[i], w) + b 
+    output = step(net) 
+    if output == 1: 
+        print(i, "is Odd") 
+    else: 
+        print(i, "is Even") 
