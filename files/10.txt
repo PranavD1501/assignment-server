@@ -1,41 +1,144 @@
+
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-vectors = np.array([
-    [1,1,-1,-1],
-    [-1,-1,1,1],
-    [1,-1,1,-1],
-    [-1,1,-1,1]
-])
+# Step 1: Load Dataset
+df = pd.read_csv("RealEstate_Prices.csv")
 
+print("Original Dataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
 
-def hopfield(patterns):
-    num_patterns , n = patterns.shape
+# Step 2: Clean Column Names
+df.columns = (
+    df.columns.str.strip()
+    .str.lower()
+    .str.replace(r"[^a-z0-9]+", "_", regex=True)
+    .str.strip("_")
+)
 
-    weights = np.zeros((n,n))
+print("\nCleaned Column Names:")
+print(df.columns.tolist())
 
-    for p in patterns :
-        weights += np.outer(p,p)
-    
+# Step 3: Remove Duplicates
+df = df.drop_duplicates()
 
-    np.fill_diagonal(weights,0)
+# Step 4: Handle Missing Values
+df = df.replace(r"^\s*$", np.nan, regex=True)
 
-    return weights
+numeric_cols = ["sale_price", "area_sqft", "bedrooms"]
 
-def activation(x):
-    return np.where(x>=0,1,-1)
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+    df[col] = df[col].fillna(df[col].median())
 
+categorical_cols = ["property_type", "neighborhood"]
 
-def recall(input_vector,weights,steps=5):
-    state = np.array(input_vector)
+for col in categorical_cols:
+    df[col] = df[col].astype("string").str.strip().str.title()
+    df[col] = df[col].fillna("Unknown")
 
-    for _ in range(steps):
-        state = activation(np.dot(weights,state))
-    
-    return state
+# Step 5: Convert Date Column
+df["sale_date"] = pd.to_datetime(
+    df["sale_date"], errors="coerce"
+)
 
+# Step 6: Handle Outliers Using IQR
+for col in ["sale_price", "area_sqft"]:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
 
-w = hopfield(vectors)
-print(w)
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
 
-for pattern in vectors:
-    print(recall(pattern,w))
+    df[col] = df[col].clip(lower, upper)
+
+# Step 7: Feature Engineering
+df["price_per_sqft"] = (
+    df["sale_price"] /
+    df["area_sqft"].replace(0, np.nan)
+)
+
+df["sale_year"] = df["sale_date"].dt.year
+
+# Step 8: Filter and Subset Data
+filtered_df = df[
+    (df["bedrooms"] >= 2) &
+    (df["sale_price"] > 0)
+]
+
+print("\nFiltered Properties:")
+print(filtered_df.head())
+
+# Step 9: Aggregate Sale Prices
+neighborhood_stats = df.groupby("neighborhood").agg(
+    average_price=("sale_price", "mean"),
+    total_properties=("sale_price", "count")
+)
+
+property_stats = df.groupby("property_type").agg(
+    average_price=("sale_price", "mean"),
+    average_area=("area_sqft", "mean")
+)
+
+print("\nNeighborhood Statistics:")
+print(neighborhood_stats)
+
+print("\nProperty Type Statistics:")
+print(property_stats)
+
+# Step 10: Encode Categorical Variables
+encoded_df = pd.get_dummies(
+    df,
+    columns=["property_type", "neighborhood"],
+    drop_first=True,
+    dtype=int
+)
+
+print("\nEncoded Dataset Shape:", encoded_df.shape)
+
+# Step 11: Visualize Average Prices by Neighborhood
+plt.figure(figsize=(9, 5))
+
+neighborhood_stats["average_price"].sort_values().plot(
+    kind="bar", color="skyblue"
+)
+
+plt.title("Average Sale Price by Neighborhood")
+plt.xlabel("Neighborhood")
+plt.ylabel("Average Sale Price")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 12: Box Plot for Sale Prices
+plt.figure(figsize=(7, 5))
+
+sns.boxplot(y=df["sale_price"])
+
+plt.title("Sale Price Distribution After Outlier Handling")
+plt.ylabel("Sale Price")
+plt.show()
+
+# Step 13: Correlation Heatmap
+plt.figure(figsize=(8, 5))
+
+sns.heatmap(
+    df.select_dtypes(include=np.number).corr(),
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f"
+)
+
+plt.title("Real Estate Feature Correlation")
+plt.tight_layout()
+plt.show()
+
+# Step 14: Export Cleaned Data
+df.to_csv("Cleaned_RealEstate.csv", index=False)
+encoded_df.to_csv("Encoded_RealEstate.csv", index=False)
+
+print("\nData Wrangling Completed Successfully!")

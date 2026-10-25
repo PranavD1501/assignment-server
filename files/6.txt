@@ -1,0 +1,169 @@
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Step 1: Define Maze Environment
+# 0 = Free path, 1 = Obstacle
+maze = np.array([
+    [0, 0, 0, 1, 0],
+    [1, 1, 0, 1, 0],
+    [0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+])
+
+start = (0, 0)
+goal = (4, 4)
+
+# Step 2: Initialize Q-table
+rows, cols = maze.shape
+q_table = np.zeros((rows, cols, 4))
+
+# Actions: Up, Down, Left, Right
+actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+# Step 3: Define Parameters
+alpha = 0.1
+gamma = 0.9
+epsilon = 1.0
+epsilon_decay = 0.995
+epsilon_min = 0.05
+episodes = 3000
+
+# Step 4: Define Environment
+def step(state, action):
+    r, c = state
+    dr, dc = actions[action]
+    nr, nc = r + dr, c + dc
+
+    if (nr < 0 or nr >= rows or nc < 0 or
+            nc >= cols or maze[nr, nc] == 1):
+        return state, -10, False
+
+    if (nr, nc) == goal:
+        return (nr, nc), 100, True
+
+    return (nr, nc), -1, False
+
+
+# Step 5: Train Agent Using Q-Learning
+rewards = []
+np.random.seed(42)
+
+for episode in range(episodes):
+    state = start
+    total_reward = 0
+
+    for _ in range(100):
+        # Epsilon-greedy action selection
+        if np.random.rand() < epsilon:
+            action = np.random.randint(4)
+        else:
+            action = np.argmax(q_table[state])
+
+        next_state, reward, done = step(state, action)
+
+        # Q-Learning update
+        old_q = q_table[state][action]
+        next_max = 0 if done else np.max(q_table[next_state])
+
+        q_table[state][action] = old_q + alpha * (
+            reward + gamma * next_max - old_q
+        )
+
+        state = next_state
+        total_reward += reward
+
+        if done:
+            break
+
+    epsilon = max(epsilon_min, epsilon * epsilon_decay)
+    rewards.append(total_reward)
+
+print("Training Completed!")
+
+
+# Step 6: Find Optimal Path
+state = start
+path = [state]
+visited = {state}
+
+for _ in range(100):
+    action = np.argmax(q_table[state])
+    next_state, reward, done = step(state, action)
+
+    if next_state == state or next_state in visited:
+        break
+
+    state = next_state
+    path.append(state)
+    visited.add(state)
+
+    if done:
+        break
+
+print("\nOptimal Path:")
+print(path)
+
+if path[-1] == goal:
+    print("Agent successfully reached the goal!")
+else:
+    print("Goal not reached. More training may be required.")
+
+
+# Step 7: Plot Training Rewards
+plt.figure(figsize=(8, 4))
+plt.plot(rewards, alpha=0.4, label="Episode Reward")
+
+# Moving average
+window = 100
+moving_avg = np.convolve(
+    rewards, np.ones(window) / window, mode="valid"
+)
+plt.plot(
+    range(window - 1, episodes),
+    moving_avg, label="Moving Average"
+)
+
+plt.xlabel("Episodes")
+plt.ylabel("Total Reward")
+plt.title("Q-Learning Training Progress")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# Step 8: Visualize Maze and Learned Path
+plt.figure(figsize=(7, 7))
+plt.imshow(maze, cmap="gray_r")
+
+# Draw path
+if len(path) > 1:
+    path_array = np.array(path)
+    plt.plot(
+        path_array[:, 1],
+        path_array[:, 0],
+        color="blue",
+        marker="o",
+        linewidth=2,
+        label="Agent Path"
+    )
+
+plt.scatter(
+    start[1], start[0],
+    color="green", s=200,
+    marker="s", label="Start"
+)
+
+plt.scatter(
+    goal[1], goal[0],
+    color="red", s=200,
+    marker="*", label="Goal"
+)
+
+plt.xticks(range(cols))
+plt.yticks(range(rows))
+plt.title("Maze Navigation Using Q-Learning")
+plt.grid(True)
+plt.legend()
+plt.show()

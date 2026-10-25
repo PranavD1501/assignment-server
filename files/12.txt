@@ -1,42 +1,150 @@
-import tensorflow as tf
 
-from tensorflow.keras import layers,models,datasets
-import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
-(x_train,y_train),(x_test,y_test) = datasets.mnist.load_data()
+# Step 1: Load Dataset
+df = pd.read_csv("Retail_Sales_Data.csv")
 
-def create_cnn():
-  model = models.Sequential([
-      #Layer 1 32 , 3 x 3
-      layers.Conv2D(32,(3,3),activation='relu',input_shape=(28,28,1)),
-      layers.MaxPooling2D((2,2)),
+print("Original Dataset:")
+print(df.head())
 
-      #Layer 2 64 , 3 x 3
-      layers.Conv2D(64,(3,3),activation='relu'),
-      layers.MaxPooling2D((2,2)),
+print("\nDataset Shape:", df.shape)
+print("\nDataset Information:")
+df.info()
 
-      layers.Flatten(),
+# Step 2: Clean Column Names
+df.columns = (
+    df.columns.str.strip()
+    .str.lower()
+    .str.replace(r"[^a-z0-9]+", "_", regex=True)
+    .str.strip("_")
+)
 
-      layers.Dense(64,activation='relu'),
-      layers.Dense(10)
+print("\nColumn Names:", df.columns.tolist())
 
+# Step 3: Data Cleaning
+df = df.drop_duplicates()
 
-  ])
+df["region"] = df["region"].astype("string").str.strip().str.title()
+df["product_category"] = (
+    df["product_category"].astype("string").str.strip().str.title()
+)
 
-  return model
+df["sales_amount"] = pd.to_numeric(
+    df["sales_amount"], errors="coerce"
+)
 
-model = create_cnn()
+df = df.dropna(
+    subset=["region", "product_category", "sales_amount"]
+)
 
+# Step 4: Descriptive Statistics
+print("\nSales Statistics:")
+print(df["sales_amount"].describe())
 
-model.compile(optimizer='adam',loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),metrics=['accuracy'])
+# Step 5: Total Sales by Region
+region_sales = (
+    df.groupby("region")["sales_amount"]
+    .sum()
+    .sort_values(ascending=False)
+)
 
-history = model.fit(x_train,y_train,epochs=10,validation_data=(x_test,y_test))
+print("\nTotal Sales by Region:")
+print(region_sales)
 
-test_acc , test_loss = model.evaluate(x_test,y_test)
+# Step 6: Identify Top Performing Regions
+print("\nTop 3 Performing Regions:")
+print(region_sales.head(3))
 
-plt.plot(history.history['val_loss'])
-plt.plot(history.history['loss'])
+print("\nBest Performing Region:", region_sales.idxmax())
+print("Highest Total Sales:", region_sales.max())
 
+# Step 7: Bar Plot - Regional Sales
+plt.figure(figsize=(9, 5))
 
-plt.plot(history.history['accuracy'])
-plt.plot(history.history['val_accuracy'])
+region_sales.plot(
+    kind="bar",
+    color="skyblue",
+    edgecolor="black"
+)
+
+plt.title("Total Sales by Region")
+plt.xlabel("Region")
+plt.ylabel("Total Sales Amount")
+plt.xticks(rotation=45)
+plt.grid(axis="y")
+plt.tight_layout()
+plt.show()
+
+# Step 8: Pie Chart - Sales Distribution
+plt.figure(figsize=(8, 8))
+
+region_sales.plot(
+    kind="pie",
+    autopct="%1.1f%%",
+    startangle=90
+)
+
+plt.title("Sales Distribution by Region")
+plt.ylabel("")
+plt.tight_layout()
+plt.show()
+
+# Step 9: Group Sales by Region and Category
+region_category_sales = (
+    df.groupby(["region", "product_category"])["sales_amount"]
+    .sum()
+    .unstack(fill_value=0)
+)
+
+print("\nRegion and Category-wise Sales:")
+print(region_category_sales)
+
+# Step 10: Stacked Bar Plot
+region_category_sales.plot(
+    kind="bar",
+    stacked=True,
+    figsize=(10, 6),
+    colormap="tab10"
+)
+
+plt.title("Category-wise Sales Across Regions")
+plt.xlabel("Region")
+plt.ylabel("Total Sales Amount")
+plt.legend(title="Product Category")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 11: Grouped Bar Plot
+region_category_sales.plot(
+    kind="bar",
+    stacked=False,
+    figsize=(10, 6),
+    colormap="Set2"
+)
+
+plt.title("Regional Sales Comparison by Category")
+plt.xlabel("Region")
+plt.ylabel("Total Sales Amount")
+plt.legend(title="Product Category")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 12: Additional Aggregations
+summary = df.groupby("region").agg(
+    Total_Sales=("sales_amount", "sum"),
+    Average_Sales=("sales_amount", "mean"),
+    Transactions=("sales_amount", "count")
+)
+
+print("\nRegional Sales Summary:")
+print(summary)
+
+# Step 13: Export Results
+region_sales.to_csv("Region_Total_Sales.csv")
+region_category_sales.to_csv("Region_Category_Sales.csv")
+summary.to_csv("Regional_Sales_Summary.csv")
+
+print("\nData Aggregation Completed Successfully!")

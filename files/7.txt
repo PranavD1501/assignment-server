@@ -1,0 +1,128 @@
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Step 1: Load data from different file formats
+csv_data = pd.read_csv("sales.csv")
+excel_data = pd.read_excel("sales.xlsx")
+json_data = pd.read_json("sales.json")
+
+print("CSV Data:\n", csv_data.head())
+print("\nExcel Data:\n", excel_data.head())
+print("\nJSON Data:\n", json_data.head())
+
+# Step 2: Combine datasets
+df = pd.concat(
+    [csv_data, excel_data, json_data],
+    ignore_index=True
+)
+
+# Standardize column names
+df.columns = df.columns.str.strip()
+
+print("\nCombined Dataset Shape:", df.shape)
+print("\nMissing Values:\n", df.isnull().sum())
+print("\nDuplicate Rows:", df.duplicated().sum())
+
+# Step 3: Data Cleaning
+df = df.drop_duplicates()
+
+# Remove duplicate orders across files
+df = df.drop_duplicates(subset=["OrderID"])
+
+# Convert columns to appropriate data types
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
+df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+
+# Handle missing values
+df["Product"] = df["Product"].fillna("Unknown")
+df["Category"] = df["Category"].fillna("Unknown")
+df["Customer"] = df["Customer"].fillna("Unknown")
+
+df = df.dropna(subset=["OrderID", "Date", "Quantity", "Price"])
+
+# Remove invalid quantities and prices
+df = df[(df["Quantity"] > 0) & (df["Price"] >= 0)]
+
+# Step 4: Data Transformation
+df["TotalSales"] = df["Quantity"] * df["Price"]
+df["Month"] = df["Date"].dt.to_period("M").astype(str)
+
+# Step 5: Descriptive Statistics
+print("\nDescriptive Statistics:")
+print(df.describe())
+
+total_sales = df["TotalSales"].sum()
+total_orders = df["OrderID"].nunique()
+average_order_value = total_sales / total_orders if total_orders else 0
+
+print("\nTotal Sales:", round(total_sales, 2))
+print("Total Orders:", total_orders)
+print("Average Order Value:", round(average_order_value, 2))
+
+# Step 6: Sales Analysis
+category_sales = df.groupby("Category")["TotalSales"].sum()
+product_sales = df.groupby("Product")["TotalSales"].sum()
+monthly_sales = df.groupby("Month")["TotalSales"].sum()
+
+category_distribution = df["Category"].value_counts()
+customer_sales = df.groupby("Customer")["TotalSales"].sum()
+
+print("\nCategory-wise Sales:\n", category_sales)
+print("\nProduct-wise Sales:\n", product_sales)
+print("\nMonthly Sales:\n", monthly_sales)
+print("\nTop Customers:\n",
+      customer_sales.sort_values(ascending=False).head())
+
+# Step 7: Bar Plot - Category-wise Sales
+plt.figure(figsize=(8, 5))
+category_sales.plot(kind="bar", color="skyblue")
+plt.title("Category-wise Total Sales")
+plt.xlabel("Category")
+plt.ylabel("Total Sales")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 8: Pie Chart - Category Distribution
+plt.figure(figsize=(7, 7))
+category_distribution.plot(
+    kind="pie",
+    autopct="%1.1f%%",
+    startangle=90
+)
+plt.title("Product Category Distribution")
+plt.ylabel("")
+plt.show()
+
+# Step 9: Line Plot - Monthly Sales Trend
+plt.figure(figsize=(8, 5))
+monthly_sales.sort_index().plot(
+    kind="line", marker="o"
+)
+plt.title("Monthly Sales Trend")
+plt.xlabel("Month")
+plt.ylabel("Total Sales")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 10: Box Plot - Sales Distribution
+plt.figure(figsize=(7, 5))
+df.boxplot(column="TotalSales")
+plt.title("Sales Value Distribution")
+plt.ylabel("Total Sales")
+plt.show()
+
+# Step 11: Save Cleaned Data
+df.to_csv("cleaned_sales.csv", index=False)
+df.to_excel("cleaned_sales.xlsx", index=False)
+df.to_json(
+    "cleaned_sales.json",
+    orient="records",
+    indent=4,
+    date_format="iso"
+)
+
+print("\nCleaned data saved successfully!")

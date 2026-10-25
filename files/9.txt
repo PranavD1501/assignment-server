@@ -1,0 +1,168 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Step 1: Load Dataset
+df = pd.read_csv("Telecom_Customer_Churn.csv")
+
+print("Original Dataset:")
+print(df.head())
+
+print("\nDataset Shape:", df.shape)
+print("\nDataset Information:")
+df.info()
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# Step 2: Standardize Column Names
+df.columns = df.columns.str.strip()
+
+# Step 3: Remove Duplicate Records
+df = df.drop_duplicates()
+
+if "customerID" in df.columns:
+    df = df.drop_duplicates(subset=["customerID"])
+
+# Step 4: Handle Missing Values
+# Replace blank strings with NaN
+df = df.replace(r"^\s*$", np.nan, regex=True)
+
+# Convert numeric columns
+numeric_columns = [
+    "tenure", "MonthlyCharges", "TotalCharges"
+]
+
+for col in numeric_columns:
+    if col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+# Fill missing numerical values with median
+for col in df.select_dtypes(include=np.number).columns:
+    df[col] = df[col].fillna(df[col].median())
+
+# Fill missing categorical values with mode
+for col in df.select_dtypes(include="object").columns:
+    if col != "customerID" and not df[col].mode().empty:
+        df[col] = df[col].fillna(df[col].mode()[0])
+
+# Step 5: Standardize Categorical Values
+for col in df.select_dtypes(include="object").columns:
+    df[col] = df[col].str.strip()
+
+# Standardize Churn values
+if "Churn" in df.columns:
+    df["Churn"] = (
+        df["Churn"]
+        .astype(str)
+        .str.lower()
+        .map({"yes": 1, "no": 0, "1": 1, "0": 0})
+    )
+
+# Step 6: Handle Outliers using IQR
+# Keep original values and cap extreme observations
+for col in ["MonthlyCharges", "TotalCharges"]:
+    if col in df.columns:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+
+        lower = Q1 - 1.5 * IQR
+        upper = Q3 + 1.5 * IQR
+
+        df[col] = df[col].clip(lower, upper)
+
+# Step 7: Feature Engineering
+if "tenure" in df.columns:
+    df["TenureGroup"] = pd.cut(
+        df["tenure"],
+        bins=[-1, 12, 24, 48, 72, np.inf],
+        labels=["0-12", "13-24", "25-48", "49-72", "72+"]
+    )
+
+if "MonthlyCharges" in df.columns:
+    df["HighMonthlyCharges"] = (
+        df["MonthlyCharges"] > df["MonthlyCharges"].median()
+    ).astype(int)
+
+# Step 8: Explore Churn Distribution
+if "Churn" in df.columns:
+    print("\nChurn Distribution:")
+    print(df["Churn"].value_counts())
+
+    sns.countplot(data=df, x="Churn")
+    plt.title("Customer Churn Distribution")
+    plt.xlabel("Churn (0 = No, 1 = Yes)")
+    plt.ylabel("Number of Customers")
+    plt.show()
+
+# Step 9: Analyze Monthly Charges by Churn
+if {"MonthlyCharges", "Churn"}.issubset(df.columns):
+    sns.boxplot(
+        data=df, x="Churn", y="MonthlyCharges"
+    )
+    plt.title("Monthly Charges vs Customer Churn")
+    plt.show()
+
+# Step 10: Prepare Features and Target
+df = df.dropna(subset=["Churn"])
+df["Churn"] = df["Churn"].astype(int)
+
+X = df.drop(columns=["Churn", "customerID"], errors="ignore")
+y = df["Churn"]
+
+# Encode categorical variables
+X = pd.get_dummies(X, drop_first=True, dtype=int)
+
+# Step 11: Split Dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
+)
+
+# Step 12: Scale Numerical Features
+scale_columns = [
+    col for col in ["tenure", "MonthlyCharges", "TotalCharges"]
+    if col in X_train.columns
+]
+
+scaler = StandardScaler()
+
+X_train[scale_columns] = scaler.fit_transform(
+    X_train[scale_columns]
+)
+
+X_test[scale_columns] = scaler.transform(
+    X_test[scale_columns]
+)
+
+print("\nTraining Set Shape:", X_train.shape)
+print("Testing Set Shape:", X_test.shape)
+
+# Step 13: Export Cleaned Dataset
+df.to_csv("Cleaned_Telecom_Churn.csv", index=False)
+
+# Export processed training and testing datasets
+train_data = X_train.copy()
+train_data["Churn"] = y_train
+
+test_data = X_test.copy()
+test_data["Churn"] = y_test
+
+train_data.to_csv("Churn_Train.csv", index=False)
+test_data.to_csv("Churn_Test.csv", index=False)
+
+print("\nData Cleaning Completed!")
+print("Files saved successfully.")
+
+print("\nFinal Missing Values:")
+print(df.isnull().sum())
+
+print("\nCleaned Dataset Shape:", df.shape)

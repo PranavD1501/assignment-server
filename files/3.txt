@@ -1,46 +1,110 @@
-import numpy as np 
- 
-# ASCII binary values of numbers 0 to 9 
-X = [] 
- 
-for i in range(10): 
-    binary = format(ord(str(i)), '07b') 
-    X.append([int(bit) for bit in binary]) 
-X = np.array(X) 
- 
-# Target output 
-y = np.array([0,1,0,1,0,1,0,1,0,1]) 
- 
-# Initialize weights and bias 
-w = np.random.rand(7)
-b = np.random.rand() 
-# Learning rate 
-lr = 0.1 
- 
-# Step activation function 
-def step(x): 
-    if x >= 0: 
-        return 1 
-    else: 
-        return 0 
- 
-# Training perceptron 
-for epoch in range(100): 
-    for i in range(10): 
-        net = np.dot(X[i], w) + b 
-        output = step(net) 
-        error = y[i] - output 
-        # Weight update 
-        w = w + lr * error * X[i] 
-        # Bias update 
-        b = b + lr * error 
- 
-# Testing 
-print("Number Recognition") 
-for i in range(10): 
-    net = np.dot(X[i], w) + b 
-    output = step(net) 
-    if output == 1: 
-        print(i, "is Odd") 
-    else: 
-        print(i, "is Even") 
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import (
+    confusion_matrix, accuracy_score,
+    precision_score, recall_score,
+    ConfusionMatrixDisplay
+)
+import kagglehub
+import pandas as pd
+import os
+
+# Download the dataset from Kaggle
+dataset_path = kagglehub.dataset_download(
+    "rakeshrau/social-network-ads"
+)
+
+# Find the CSV file
+csv_files = [
+    f for f in os.listdir(dataset_path)
+    if f.endswith(".csv")
+]
+
+print("Available CSV files:", csv_files)
+
+# Load the dataset
+df = pd.read_csv(
+    os.path.join(dataset_path, csv_files[0])
+)
+
+# Remove extra spaces from column names
+df.columns = df.columns.str.strip()
+
+print("\nDataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
+print("\nColumns:", df.columns.tolist())
+
+# Step 2: Select features and target
+X = df[["Age", "EstimatedSalary"]]
+y = df["Purchased"]
+
+# Step 3: Split into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.25,
+    random_state=42,
+    stratify=y
+)
+
+# Step 4: Feature scaling
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# Step 5: Train KNN classifier
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+
+# Step 6: Predict test data
+y_pred = knn.predict(X_test)
+
+# Step 7: Evaluate model
+cm = confusion_matrix(y_test, y_pred)
+
+accuracy = accuracy_score(y_test, y_pred)
+error_rate = 1 - accuracy
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+
+print("\nConfusion Matrix:")
+print(cm)
+
+print("\nAccuracy:", round(accuracy, 4))
+print("Error Rate:", round(error_rate, 4))
+print("Precision:", round(precision, 4))
+print("Recall:", round(recall, 4))
+
+# Step 8: Plot confusion matrix
+disp = ConfusionMatrixDisplay(
+    confusion_matrix=cm,
+    display_labels=["Not Purchased", "Purchased"]
+)
+disp.plot(cmap="Blues")
+plt.title("KNN Confusion Matrix")
+plt.show()
+
+# Step 9: Compare error rates for different K values
+error_rates = []
+
+k_values = range(1, 21)
+
+for k in k_values:
+    model = KNeighborsClassifier(n_neighbors=k)
+    model.fit(X_train, y_train)
+
+    predictions = model.predict(X_test)
+    error_rates.append(1 - accuracy_score(y_test, predictions))
+
+plt.figure(figsize=(8, 5))
+plt.plot(k_values, error_rates, marker="o")
+plt.xlabel("Number of Neighbors (K)")
+plt.ylabel("Error Rate")
+plt.title("KNN: Error Rate vs K Value")
+plt.xticks(list(k_values))
+plt.grid(True)
+plt.show()

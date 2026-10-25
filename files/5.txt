@@ -1,52 +1,88 @@
-import numpy as np
 
-#input patterns
-x1 = np.array([1,1,1,1,1,1]).reshape(6,1)
-x2 = np.array([-1,-1,-1,-1,-1,-1]).reshape(6,1)
-x3 = np.array([1,1,-1,-1,1,1]).reshape(6,1)
-x4 = np.array([-1,1,1,1,1,-1]).reshape(6,1)
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score, confusion_matrix,
+    classification_report, ConfusionMatrixDisplay
+)
 
+# Step 1: Load local dataset
+columns = [
+    "buying", "maint", "doors", "persons",
+    "lug_boot", "safety", "class"
+]
 
-#Target patterns
-y1 = np.array([1,1,1]).reshape(3,1)
-y2 = np.array([-1,-1,-1]).reshape(3,1)
-y3 = np.array([1,1,-1]).reshape(3,1)
-y4 = np.array([-1,1,1]).reshape(3,1)
+df = pd.read_csv("car_evaluation.csv")
 
+# Handle CSV files without column headers
+if "class" not in df.columns:
+    df = pd.read_csv(
+        "car_evaluation.csv", header=None, names=columns
+    )
 
-inputset = np.concatenate((x1,x2,x3,x4),axis=1)
-print(inputset)
+print("Dataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
 
-outputset = np.concatenate((y1,y2,y3,y4),axis=1)
-print(outputset)
+# Step 2: Separate features and target
+X = df.drop("class", axis=1)
+y = df["class"]
 
+# Step 3: Split dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25,
+    random_state=42, stratify=y
+)
 
-weight = np.dot(inputset,outputset.T)
+# Step 4: Encode categorical variables
+preprocessor = ColumnTransformer([
+    ("encoder", OneHotEncoder(handle_unknown="ignore"), X.columns)
+])
 
-print(weight)
+# Step 5: Train Random Forest classifier
+model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", RandomForestClassifier(
+        n_estimators=100,
+        random_state=42
+    ))
+])
 
-#Testing input patterns
+model.fit(X_train, y_train)
 
-def test_input(x,weight):
+# Step 6: Predict test data
+y_pred = model.predict(X_test)
 
-    y=np.dot(weight.T,x)
+# Step 7: Evaluate performance
+print("\nAccuracy:", round(accuracy_score(y_test, y_pred), 4))
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
 
-    
-    y[y<0] = -1
-    y[y>0] = 1
+# Step 8: Plot confusion matrix
+labels = ["unacc", "acc", "good", "vgood"]
+cm = confusion_matrix(y_test, y_pred, labels=labels)
 
-    return np.array(y)
+disp = ConfusionMatrixDisplay(
+    confusion_matrix=cm, display_labels=labels
+)
+disp.plot(cmap="Blues")
+plt.title("Random Forest - Car Evaluation")
+plt.show()
 
-print(test_input(x1,weight))
+# Step 9: Predict a new car
+new_car = pd.DataFrame([{
+    "buying": "low",
+    "maint": "low",
+    "doors": "4",
+    "persons": "4",
+    "lug_boot": "big",
+    "safety": "high"
+}])
 
-def test_targets(y,weight):
-
-    x = np.dot(weight,y)
-
-
-    x[x<0] = -1
-    x[x>0] = 1
-
-    return np.array(x)
-
-print(test_targets(y1,weight))
+prediction = model.predict(new_car)
+print("\nPredicted Car Class:", prediction[0])

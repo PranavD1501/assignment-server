@@ -1,51 +1,224 @@
-import numpy as np
 
-input_patterns =[
-    [0,0],
-    [1,0],
-    [1,1],
-    [0,1]
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from ucimlrepo import fetch_ucirepo
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import (
+    accuracy_score, r2_score, mean_squared_error
+)
+
+# 1. LOAD DATASETS
+
+# UCI Early Stage Diabetes Dataset
+uci = fetch_ucirepo(id=529)
+uci_df = pd.concat(
+    [uci.data.features, uci.data.targets], axis=1
+)
+
+uci_df.columns = [
+    col.strip().replace(" ", "_").lower()
+    for col in uci_df.columns
 ]
 
-# Both Excitaroy Weights
-w1 = 1
-w2 = 1
+uci_df["class"] = (
+    uci_df["class"].str.lower()
+    .map({"positive": 1, "negative": 0})
+)
 
-theta = 1
+# Encode categorical features
+uci_df = pd.get_dummies(
+    uci_df, drop_first=True, dtype=int
+)
 
-def activation(x):
-    return np.where(x>=theta,1,0)
+# Pima Indians Diabetes Dataset
+pima_url = (
+    "https://raw.githubusercontent.com/"
+    "Kabin24/Pima-Indians-Diabetes-Dataset/"
+    "main/diabetes.csv"
+)
+pima_df = pd.read_csv(pima_url)
 
-
-for x1,x2 in input_patterns:
-    yin = w1*x1 + w2*x2
-
-    y = activation(yin)
-
-    print(f"Input : {x1,x2} Output : {y}")
-
-
-#Both inhibitory weights
-
-w3 = -1
-w4 = -1
-
-for x1,x2 in input_patterns:
-    yin = w3*x1 + w4*x2
-
-    y = activation(yin)
-
-    print(f"Input : {x1,x2} Output : {y}")
+print("UCI Dataset:", uci_df.shape)
+print("Pima Dataset:", pima_df.shape)
 
 
-#One Exciatory and One Inhibitory
+# 2. UNIVARIATE ANALYSIS
 
-w5 = 1
-w6 = -1
+def univariate_analysis(df, name):
+    print("\n==========", name, "==========")
 
-for x1,x2 in input_patterns:
-    yin = w5*x1 + w6*x2
+    numeric = df.select_dtypes(include=np.number)
 
-    y = activation(yin)
+    stats = pd.DataFrame({
+        "Mean": numeric.mean(),
+        "Median": numeric.median(),
+        "Mode": numeric.mode().iloc[0],
+        "Variance": numeric.var(),
+        "Std Dev": numeric.std(),
+        "Skewness": numeric.skew(),
+        "Kurtosis": numeric.kurt()
+    })
 
-    print(f"Input : {x1,x2} Output : {y}")
+    print("\nStatistical Summary:")
+    print(stats.round(3))
+
+    print("\nTarget Frequency:")
+    target = "class" if name == "UCI" else "Outcome"
+    print(df[target].value_counts())
+
+    print("\nFrequency of First Feature:")
+    print(df.iloc[:, 0].value_counts().head(10))
+
+
+# 3. REGRESSION ANALYSIS
+
+def regression_analysis(df, name, target):
+    print("\n========== REGRESSION:", name, "==========")
+
+    X = df.drop(columns=[target])
+    y = df[target]
+
+    # Handle missing values
+    X = X.fillna(X.median())
+    y = y.astype(int)
+
+    # Stratified train-test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2,
+        random_state=42, stratify=y
+    )
+
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s = scaler.transform(X_test)
+
+    # A. BIVARIATE LINEAR REGRESSION
+    # Select a single common predictor: Age
+    age_col = "age" if name == "UCI" else "Age"
+    age_index = X.columns.get_loc(age_col)
+
+    X_train_age = X_train_s[:, [age_index]]
+    X_test_age = X_test_s[:, [age_index]]
+
+    linear = LinearRegression()
+    linear.fit(X_train_age, y_train)
+
+    linear_pred = linear.predict(X_test_age)
+
+    linear_r2 = r2_score(y_test, linear_pred)
+
+    print("\nBivariate Linear Regression")
+    print("R2 Score:", round(linear_r2, 3))
+
+    # B. BIVARIATE LOGISTIC REGRESSION
+    logistic = LogisticRegression(max_iter=1000)
+    logistic.fit(X_train_age, y_train)
+
+    logistic_pred = logistic.predict(X_test_age)
+
+    log_accuracy = accuracy_score(
+        y_test, logistic_pred
+    )
+
+    print("\nBivariate Logistic Regression")
+    print("Accuracy:", round(log_accuracy, 3))
+
+    # C. MULTIPLE LINEAR REGRESSION
+    multiple = LinearRegression()
+    multiple.fit(X_train_s, y_train)
+
+    multiple_pred = multiple.predict(X_test_s)
+
+    multiple_r2 = r2_score(
+        y_test, multiple_pred
+    )
+
+    multiple_mse = mean_squared_error(
+        y_test, multiple_pred
+    )
+
+    print("\nMultiple Linear Regression")
+    print("R2 Score:", round(multiple_r2, 3))
+    print("MSE:", round(multiple_mse, 3))
+
+    # D. MULTIPLE LOGISTIC REGRESSION
+    multi_logistic = LogisticRegression(max_iter=1000)
+    multi_logistic.fit(X_train_s, y_train)
+
+    multi_log_pred = multi_logistic.predict(X_test_s)
+
+    multi_accuracy = accuracy_score(
+        y_test, multi_log_pred
+    )
+
+    print("\nMultiple Logistic Regression")
+    print("Accuracy:", round(multi_accuracy, 3))
+
+    # Visualization
+    plt.figure(figsize=(7, 4))
+    plt.scatter(
+        X_test[age_col], y_test,
+        alpha=0.4, label="Actual"
+    )
+    plt.scatter(
+        X_test[age_col], linear_pred,
+        alpha=0.4, label="Predicted"
+    )
+
+    plt.title(name + " - Linear Regression")
+    plt.xlabel("Age")
+    plt.ylabel("Diabetes Outcome")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    return {
+        "Dataset": name,
+        "Bivariate Linear R2": linear_r2,
+        "Bivariate Logistic Accuracy": log_accuracy,
+        "Multiple Linear R2": multiple_r2,
+        "Multiple Linear MSE": multiple_mse,
+        "Multiple Logistic Accuracy": multi_accuracy
+    }
+
+
+# 4. PERFORM ANALYSIS
+
+univariate_analysis(uci_df, "UCI")
+univariate_analysis(pima_df, "Pima")
+
+uci_results = regression_analysis(
+    uci_df, "UCI", "class"
+)
+
+pima_results = regression_analysis(
+    pima_df, "Pima", "Outcome"
+)
+
+
+# 5. COMPARE RESULTS
+
+comparison = pd.DataFrame([
+    uci_results,
+    pima_results
+])
+
+print("\n========== FINAL COMPARISON ==========")
+print(comparison.round(3).to_string(index=False))
+
+comparison.set_index("Dataset")[
+    ["Bivariate Logistic Accuracy",
+     "Multiple Logistic Accuracy"]
+].plot(kind="bar", figsize=(8, 5))
+
+plt.title("UCI vs Pima - Logistic Regression")
+plt.ylabel("Accuracy")
+plt.ylim(0, 1)
+plt.xticks(rotation=0)
+plt.grid(axis="y")
+plt.tight_layout()
+plt.show()

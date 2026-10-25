@@ -1,50 +1,74 @@
-import numpy as np
+
+import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
-def perceptron_learning(inputs,labels,learning_rate=0.1,epochs=100):
-    weights = np.random.rand(2)
-    bias = np.random.rand(1)
+# Step 1: Load local Iris.csv
+df = pd.read_csv("Iris.csv")
 
-    for epoch in range(epochs):
+print("Dataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
 
-        for x,y in zip(inputs,labels):
+# Step 2: Select numerical features
+X = df.drop(columns=["Id", "Species"], errors="ignore")
+X = X.select_dtypes(include="number")
 
-            prediction = np.dot(weights,x) + bias
-            prediction =1 if prediction >=0 else 0
+# Step 3: Standardize features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-            error = y - prediction
+# Step 4: Elbow Method
+wcss = []
 
-            weights += learning_rate * error * x
-            bias += learning_rate * error
-    
-    return weights,bias
+for k in range(1, 11):
+    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    kmeans.fit(X_scaled)
+    wcss.append(kmeans.inertia_)
 
+# Step 5: Plot Elbow Graph
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, 11), wcss, marker="o")
+plt.title("Elbow Method - Iris Dataset")
+plt.xlabel("Number of Clusters (K)")
+plt.ylabel("WCSS")
+plt.xticks(range(1, 11))
+plt.grid(True)
+plt.show()
 
-inputs = np.array([[1, 2], [2, 3], [3, 1], [4, 4], [5, 3], [6, 4]])
-labels = np.array([0, 0, 0, 1, 1, 1])
+# Step 6: Apply K-Means with K = 3
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+clusters = kmeans.fit_predict(X_scaled)
 
+df["Cluster"] = clusters
 
-weights , bias = perceptron_learning(inputs,labels)
+print("\nCluster Counts:")
+print(df["Cluster"].value_counts().sort_index())
 
-print(weights,bias)
+# Step 7: PCA for visualization
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+centers = pca.transform(kmeans.cluster_centers_)
 
-def plot_descision_boundary(inputs,labels,weights,bias):
-    for i in range(len(inputs)):
+# Step 8: Visualize clusters
+plt.figure(figsize=(8, 6))
 
-        if labels[i] == 0:
-            plt.scatter(inputs[i][0],inputs[i][1],color='red')
-        else:
-            plt.scatter(inputs[i][0],inputs[i][1],color='blue')
+scatter = plt.scatter(
+    X_pca[:, 0], X_pca[:, 1],
+    c=clusters, cmap="viridis", s=40
+)
 
-        
-    
-    x_values = np.array([0,7])
+plt.scatter(
+    centers[:, 0], centers[:, 1],
+    c="red", marker="X", s=200, label="Centroids"
+)
 
-    y_values = -(weights[0] * x_values + bias) / weights[1]
-
-    plt.plot(x_values,y_values)
-
-    
-    plt.show()
-
-plot_descision_boundary(inputs,labels,weights,bias)
+plt.title("K-Means Clustering - Iris Dataset")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.colorbar(scatter, label="Cluster")
+plt.legend()
+plt.grid(True)
+plt.show()

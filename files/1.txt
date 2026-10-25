@@ -1,82 +1,62 @@
-import numpy as np
+
+import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
-x = np.linspace(-10,10,100)
+# Step 1: Load the Wine Dataset
+url = "https://media.geeksforgeeks.org/wp-content/uploads/Wine.csv"
+df = pd.read_csv(url)
 
-def linear_activation(x):
-  return x
+print("Original Dataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
 
-plt.plot(x,linear_activation(x))
-plt.title('Linear Activation')
+# Step 2: Separate features and target variable
+# The Wine.csv dataset uses 'Customer_Segment' as its class label.
+X = df.drop("Customer_Segment", axis=1)
+y = df["Customer_Segment"]
 
+# Step 3: Standardize the features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-def sigmoid_activation(x):
-  return 1 / (1 + np.exp(-x))
+# Step 4: Apply PCA
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
 
-def sigmoid_derivative(x):
-  return x * (1-x)
+# Step 5: Create a new DataFrame
+pca_df = pd.DataFrame(
+    X_pca, columns=["PC1", "PC2"]
+)
+pca_df["Wine_Class"] = y.values
 
-y = sigmoid_activation(x)
-y_derivative = sigmoid_derivative(y)
+print("\nDataset After PCA:")
+print(pca_df.head())
 
-plt.plot(y)
-plt.plot(y_derivative)
+# Step 6: Explained variance
+print("\nExplained Variance Ratio:")
+print(pca.explained_variance_ratio_)
 
-plt.title('Sigmoid Activation')
+print("\nTotal Variance Explained:",
+      sum(pca.explained_variance_ratio_) * 100, "%")
 
+# Step 7: Visualize the PCA results
+plt.figure(figsize=(8, 6))
 
-def tanh_activation(x):
-  return np.tanh(x)
+for wine_class in sorted(pca_df["Wine_Class"].unique()):
+    subset = pca_df[pca_df["Wine_Class"] == wine_class]
 
-def tanh_derivative(x):
-  y = tanh_activation(x)
-  return 1 - y**2
+    plt.scatter(
+        subset["PC1"],
+        subset["PC2"],
+        label=f"Wine Class {wine_class}",
+        alpha=0.7
+    )
 
-y = tanh_activation(x)
-y_derivative = tanh_derivative(y)
-
-plt.plot(y)
-plt.plot(y_derivative)
-plt.title('Tanh Activation')
-
-
-def relu_activation(x):
-  return np.maximum(0,x)
-
-def relu_derivative(x):
-  return np.where(x>0,1,0)
-
-y = relu_activation(x)
-y_derivative = relu_derivative(y)
-
-plt.plot(y)
-plt.plot(y_derivative)
-
-plt.title("Relu Activation")
-
-
-
-def binary_activation(x):
-  return np.where(x>=0,1,0)
-
-plt.plot(binary_activation(x))
-
-
-
-def swish_activation(x):
-  return x * sigmoid_activation(x)
-
-
-plt.plot(swish_activation(x))
-
-
-
-
-def leaky_relu(x,alpha=0.1):
-  return np.where(x>0,x,alpha * x)
-
-def leaky_relu_derivative(x,alpha=0.1):
-  return np.where(x>0,1,alpha)
-
-plt.plot(leaky_relu(x))
-plt.plot(leaky_relu_derivative(x))
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.title("PCA on Wine Dataset")
+plt.legend()
+plt.grid(True)
+plt.show()

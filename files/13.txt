@@ -1,0 +1,207 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima.model import ARIMA
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+# Step 1: Load Dataset
+df = pd.read_csv("Stock_Prices.csv")
+
+print("Original Dataset:")
+print(df.head())
+print("\nDataset Shape:", df.shape)
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# Step 2: Standardize Column Names
+df.columns = (
+    df.columns.str.strip()
+    .str.lower()
+    .str.replace(r"[^a-z0-9]+", "_", regex=True)
+    .str.strip("_")
+)
+
+if "closing_price" in df.columns:
+    df = df.rename(columns={"closing_price": "close"})
+
+# Step 3: Convert Date and Numerical Columns
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+for col in ["close", "volume"]:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+df = df.dropna(subset=["date", "close"])
+df = df.drop_duplicates(subset=["date"])
+df = df.sort_values("date").set_index("date")
+
+# Step 4: Explore Data
+print("\nStatistical Summary:")
+print(df.describe())
+
+# Step 5: Historical Stock Price Trend
+plt.figure(figsize=(10, 5))
+plt.plot(df.index, df["close"], label="Closing Price")
+plt.title("Historical Stock Price Trend")
+plt.xlabel("Date")
+plt.ylabel("Closing Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 6: Moving Averages
+df["MA20"] = df["close"].rolling(window=20).mean()
+df["MA50"] = df["close"].rolling(window=50).mean()
+
+plt.figure(figsize=(10, 5))
+plt.plot(df.index, df["close"], label="Closing Price", alpha=0.5)
+plt.plot(df.index, df["MA20"], label="20-Day MA")
+plt.plot(df.index, df["MA50"], label="50-Day MA")
+plt.title("Stock Price with Moving Averages")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 7: Monthly Trend Analysis
+monthly = df["close"].resample("MS").mean()
+
+plt.figure(figsize=(10, 5))
+plt.plot(monthly.index, monthly.values, marker="o")
+plt.title("Monthly Average Closing Price")
+plt.xlabel("Month")
+plt.ylabel("Average Price")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 8: Weekly Seasonality Analysis
+df["daily_return"] = df["close"].pct_change()
+
+weekday_returns = df.groupby(
+    df.index.dayofweek
+)["daily_return"].mean()
+
+plt.figure(figsize=(8, 5))
+plt.bar(
+    weekday_returns.index,
+    weekday_returns.values
+)
+plt.title("Average Stock Returns by Day of Week")
+plt.xlabel("Day of Week (Monday = 0)")
+plt.ylabel("Average Daily Return")
+plt.xticks(range(5), [
+    "Mon", "Tue", "Wed", "Thu", "Fri"
+])
+plt.grid(axis="y")
+plt.tight_layout()
+plt.show()
+
+# Step 9: Correlation Analysis
+if "volume" in df.columns:
+    corr = df[["close", "volume"]].corr()
+
+    print("\nPrice and Volume Correlation:")
+    print(corr)
+
+    plt.figure(figsize=(8, 5))
+    plt.scatter(
+        df["volume"],
+        df["close"],
+        alpha=0.4
+    )
+    plt.title("Trading Volume vs Closing Price")
+    plt.xlabel("Trading Volume")
+    plt.ylabel("Closing Price")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+# Step 10: Split Time Series
+prices = df["close"]
+
+if len(prices) < 30:
+    raise ValueError("At least 30 observations are required.")
+
+split = int(len(prices) * 0.8)
+
+train = prices.iloc[:split]
+test = prices.iloc[split:]
+
+# Step 11: Train ARIMA Model
+model = ARIMA(train.to_numpy(), order=(5, 1, 0))
+model_fit = model.fit()
+
+# Step 12: Predict Test Set
+predictions = model_fit.forecast(steps=len(test))
+
+mae = mean_absolute_error(test, predictions)
+rmse = np.sqrt(mean_squared_error(test, predictions))
+
+print("\nARIMA Model Evaluation:")
+print("MAE:", round(mae, 4))
+print("RMSE:", round(rmse, 4))
+
+# Step 13: Actual vs Predicted Prices
+plt.figure(figsize=(10, 5))
+plt.plot(test.index, test.values, label="Actual Price")
+plt.plot(
+    test.index, predictions,
+    label="ARIMA Prediction", linestyle="--"
+)
+plt.title("Actual vs Predicted Stock Prices")
+plt.xlabel("Date")
+plt.ylabel("Closing Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 14: Forecast Next 10 Trading Sessions
+final_model = ARIMA(
+    prices.to_numpy(), order=(5, 1, 0)
+).fit()
+
+future_forecast = final_model.forecast(steps=10)
+
+# Approximate future trading days (excludes weekends,
+# but does not account for exchange holidays)
+future_dates = pd.bdate_range(
+    start=df.index[-1] + pd.Timedelta(days=1),
+    periods=10
+)
+
+forecast_df = pd.DataFrame({
+    "Date": future_dates,
+    "Predicted_Close": future_forecast
+})
+
+print("\nNext 10 Trading-Day Forecast:")
+print(forecast_df)
+
+plt.figure(figsize=(10, 5))
+plt.plot(
+    df.index[-50:], df["close"].iloc[-50:],
+    label="Historical Price"
+)
+plt.plot(
+    future_dates, future_forecast,
+    marker="o", linestyle="--",
+    label="Forecast"
+)
+plt.title("ARIMA Future Stock Price Forecast")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 15: Export Results
+df.to_csv("Processed_Stock_Prices.csv")
+forecast_df.to_csv("Stock_Forecast.csv", index=False)
+
+print("\nTime Series Analysis Completed!")

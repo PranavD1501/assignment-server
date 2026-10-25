@@ -1,55 +1,220 @@
-import numpy as np
 
-patterns = np.array([
-    [1,0,1,0],
-    [1,1,0,0],
-    [0,0,1,1],
-    [0,1,1,0]
-])
+import os
+import getpass
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+# Step 1: API configuration
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
-rho = 0.9 #vigilance parameter
+if not API_KEY:
+    API_KEY = getpass.getpass("Enter OpenWeatherMap API Key: ")
 
-n_features = patterns.shape[1]
+# Locations for weather analysis
+cities = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Delhi": (28.6139, 77.2090)
+}
 
-max_clusters = len(patterns)
+url = "https://api.openweathermap.org/data/2.5/forecast"
 
-bottom_up = np.ones((max_clusters,n_features))
+# Step 2: Retrieve weather data
+records = []
 
+for city, (lat, lon) in cities.items():
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "appid": API_KEY,
+        "units": "metric"
+    }
 
-top_down = np.ones((max_clusters,n_features)) / (1 + n_features)
+    response = requests.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    data = response.json()
 
-clusters = []
+    for item in data["list"]:
+        records.append({
+            "City": city,
+            "Date": pd.to_datetime(item["dt"], unit="s", utc=True),
+            "Temperature": item["main"].get("temp"),
+            "Humidity": item["main"].get("humidity"),
+            "WindSpeed": item.get("wind", {}).get("speed"),
+            "Rainfall": item.get("rain", {}).get("3h", 0),
+            "Latitude": lat,
+            "Longitude": lon
+        })
 
+# Step 3: Create DataFrame
+df = pd.DataFrame(records)
 
-#Training
+print("\nOriginal Weather Data:")
+print(df.head())
 
-for pattern in patterns:
-    matched = False
+# Step 4: Data cleaning
+df = df.drop_duplicates(subset=["City", "Date"])
 
+numeric_cols = [
+    "Temperature", "Humidity",
+    "WindSpeed", "Rainfall"
+]
 
-    for i in range(len(clusters)):
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        match_score = np.sum(pattern * top_down[i]) / np.sum(pattern)
+df = df.dropna(subset=["Temperature", "Date"])
 
-        if match_score >= rho:
-            top_down[i] = top_down[i] * pattern
+df["Humidity"] = df["Humidity"].fillna(df["Humidity"].median())
+df["WindSpeed"] = df["WindSpeed"].fillna(0)
+df["Rainfall"] = df["Rainfall"].fillna(0)
 
-            matched = True
+# Step 5: Data transformation
+df["Day"] = df["Date"].dt.date
+df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-            print(f"Pattern {pattern} belongs to {i+1} cluster")
+# Step 6: Descriptive statistics
+print("\nWeather Statistics:")
+print(df[numeric_cols].describe())
 
-            break
-    
-    if not matched :
-        clusters.append(pattern)
+print("\nAverage Temperature by City:")
+print(df.groupby("City")["Temperature"].mean())
 
-        new_index  = len(clusters) - 1
-        top_down[new_index] = pattern
+print("\nMaximum and Minimum Temperature:")
+print(df.groupby("City")["Temperature"].agg(["min", "max"]))
 
-        print(f"Pattern {pattern} creates new cluster {len(clusters)}")
+# Step 7: Daily aggregation
+daily = df.groupby(["City", "Day"]).agg(
+    AvgTemp=("Temperature", "mean"),
+    MinTemp=("Temperature", "min"),
+    MaxTemp=("Temperature", "max"),
+    AvgHumidity=("Humidity", "mean"),
+    AvgWind=("WindSpeed", "mean"),
+    TotalRain=("Rainfall", "sum")
+).reset_index()
 
+print("\nDaily Weather Summary:")
+print(daily.head(10))
 
-for i , cluster in enumerate(clusters):
-    print(f"\nCluster {i+1} : ")
-    print(cluster)
+# Step 8: Monthly aggregation
+monthly = df.groupby(["City", "Month"]).agg(
+    AvgTemp=("Temperature", "mean"),
+    TotalRain=("Rainfall", "sum")
+).reset_index()
+
+print("\nMonthly Summary:")
+print(monthly)
+
+# Step 9: Temperature trend
+plt.figure(figsize=(10, 5))
+
+for city in cities:
+    subset = df[df["City"] == city]
+    plt.plot(
+        subset["Date"],
+        subset["Temperature"],
+        label=city
+    )
+
+plt.title("Temperature Trends")
+plt.xlabel("Date")
+plt.ylabel("Temperature (C)")
+plt.xticks(rotation=45)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 10: Daily rainfall bar plot
+rainfall = daily.pivot(
+    index="Day",
+    columns="City",
+    values="TotalRain"
+)
+
+rainfall.plot(kind="bar", figsize=(9, 5))
+plt.title("Daily Rainfall Comparison")
+plt.xlabel("Date")
+plt.ylabel("Rainfall (mm)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 11: Average wind speed
+wind = df.groupby("City")["WindSpeed"].mean()
+
+plt.figure(figsize=(7, 4))
+wind.plot(kind="bar")
+plt.title("Average Wind Speed by City")
+plt.ylabel("Wind Speed (m/s)")
+plt.xticks(rotation=0)
+plt.tight_layout()
+plt.show()
+
+# Step 12: Temperature vs Humidity
+plt.figure(figsize=(8, 5))
+
+sns.scatterplot(
+    data=df,
+    x="Temperature",
+    y="Humidity",
+    hue="City"
+)
+
+plt.title("Temperature vs Humidity")
+plt.grid(True)
+plt.show()
+
+# Step 13: Correlation heatmap
+plt.figure(figsize=(7, 5))
+
+sns.heatmap(
+    df[numeric_cols].corr(),
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f"
+)
+
+plt.title("Weather Attribute Correlation")
+plt.tight_layout()
+plt.show()
+
+# Step 14: Geographical visualization
+city_summary = df.groupby("City").agg(
+    Latitude=("Latitude", "first"),
+    Longitude=("Longitude", "first"),
+    AvgTemp=("Temperature", "mean")
+).reset_index()
+
+plt.figure(figsize=(8, 6))
+
+scatter = plt.scatter(
+    city_summary["Longitude"],
+    city_summary["Latitude"],
+    c=city_summary["AvgTemp"],
+    cmap="coolwarm",
+    s=250
+)
+
+for _, row in city_summary.iterrows():
+    plt.annotate(
+        row["City"],
+        (row["Longitude"], row["Latitude"]),
+        xytext=(5, 5),
+        textcoords="offset points"
+    )
+
+plt.colorbar(scatter, label="Avg Temperature (C)")
+plt.xlabel("Longitude")
+plt.ylabel("Latitude")
+plt.title("Geographical Weather Comparison")
+plt.grid(True)
+plt.show()
+
+# Step 15: Save processed data
+df.to_csv("weather_data.csv", index=False)
+daily.to_csv("daily_weather_summary.csv", index=False)
+
+print("\nWeather analysis completed successfully!")
